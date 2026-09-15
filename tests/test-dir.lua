@@ -227,6 +227,30 @@ do
 end
 
 
+-- test: dirtree/getallfiles must not descend into directory symlinks (cycle -> hangs)
+do
+  local dirName = path.tmpname()
+  os.remove(dirName)
+  assert(dir.makepath(path.normpath(dirName .. "/sub")))
+  assert(file.write(path.normpath(dirName .. "/top.txt"), "hello world"))
+  -- symlink pointing back at an ancestor: following it is an endless cycle
+  assert(lfs.link(dirName, path.normpath(dirName .. "/sub/loop"), true))
+
+  -- row A: the iterator must terminate
+  local count = 0
+  for _ in dir.dirtree(dirName) do
+    count = count + 1
+    assert(count <= 10, "dir.dirtree did not terminate; it followed a directory symlink cycle")
+  end
+  asserteq(count, 3)   -- sub, sub/loop, top.txt
+
+  -- row B: the symlink is a directory, so getallfiles must not report it as a file
+  asserteq(dir.getallfiles(dirName), {path.normpath(dirName .. "/top.txt")})
+
+  assert(dir.rmtree(dirName))
+end
+
+
 -- have NO idea why forcing the return code is necessary here (Windows 7 64-bit)
 os.exit(0)
 

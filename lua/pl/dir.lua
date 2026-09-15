@@ -17,7 +17,7 @@ local remove = os.remove
 local append = table.insert
 local assert_arg,assert_string,raise = utils.assert_arg,utils.assert_string,utils.raise
 
-local exists, isdir = path.exists, path.isdir
+local exists, isdir, islink = path.exists, path.isdir, path.islink
 local sep = path.sep
 
 local dir = {}
@@ -478,7 +478,7 @@ local function treeiter(iterstack)
         entry = dirname .. sep .. entry
         if exists(entry) then  -- Just in case a symlink is broken.
             local is_dir = isdir(entry)
-            if is_dir then
+            if is_dir and not islink(entry) then  -- a link to an ancestor would loop forever
                 table.insert(iterstack, { entry, ldir(entry) })
             end
             return entry, is_dir
