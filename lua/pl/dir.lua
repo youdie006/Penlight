@@ -18,7 +18,7 @@ local append = table.insert
 local assert_arg,assert_string,raise = utils.assert_arg,utils.assert_string,utils.raise
 
 local exists, isdir, islink = path.exists, path.isdir, path.islink
-local abspath, normpath, isabs = path.abspath, path.normpath, path.isabs
+local abspath, common_prefix = path.abspath, path.common_prefix
 local parentdir = path.dirname
 local link_target = require 'lfs'.symlinkattributes
 local sep = path.sep
@@ -465,10 +465,9 @@ local function links_to_ancestor(entry)
     if not islink(entry) then return false end
     local target = link_target(entry, 'target')
     if not target then return false end
-    if not isabs(target) then target = parentdir(entry) .. sep .. target end
-    target = normpath(abspath(target))
-    local here = normpath(abspath(entry))
-    return here == target or sub(here, 1, #target + 1) == target .. sep
+    target = abspath(target, parentdir(entry))
+    local here = abspath(entry)
+    return here == target or common_prefix(here, target) == target
 end
 
 
