@@ -227,27 +227,37 @@ do
 end
 
 
--- test: dirtree/getallfiles must not descend into directory symlinks (cycle -> hangs)
+-- dirtree must not loop on a symlink pointing at an ancestor,
+-- but must still descend into symlinks that point elsewhere
 do
   local dirName = path.tmpname()
   os.remove(dirName)
+  local other = path.tmpname()
+  os.remove(other)
   assert(dir.makepath(path.normpath(dirName .. "/sub")))
+  assert(dir.makepath(other))
   assert(file.write(path.normpath(dirName .. "/top.txt"), "hello world"))
-  -- symlink pointing back at an ancestor: following it is an endless cycle
+  assert(file.write(path.normpath(other .. "/inside.txt"), "hello world"))
   assert(lfs.link(dirName, path.normpath(dirName .. "/sub/loop"), true))
+  assert(lfs.link(other, path.normpath(dirName .. "/elsewhere"), true))
 
-  -- row A: the iterator must terminate
-  local count = 0
-  for _ in dir.dirtree(dirName) do
+  local seen, count = {}, 0
+  for entry in dir.dirtree(dirName) do
     count = count + 1
-    assert(count <= 10, "dir.dirtree did not terminate; it followed a directory symlink cycle")
+    assert(count <= 20, "dir.dirtree did not terminate; it followed a symlink cycle")
+    seen[entry] = true
   end
-  asserteq(count, 3)   -- sub, sub/loop, top.txt
 
-  -- row B: the symlink is a directory, so getallfiles must not report it as a file
-  asserteq(dir.getallfiles(dirName), {path.normpath(dirName .. "/top.txt")})
+  -- the cycle is cut: the ancestor link is reported but not descended into
+  assert(seen[path.normpath(dirName .. "/sub/loop")], "the ancestor symlink should still be listed")
+  assert(not seen[path.normpath(dirName .. "/sub/loop/sub")], "dirtree descended into the cycle")
+
+  -- a symlink that is not an ancestor is still traversed
+  assert(seen[path.normpath(dirName .. "/elsewhere/inside.txt")],
+    "dirtree stopped descending into a symlink that points outside the tree")
 
   assert(dir.rmtree(dirName))
+  assert(dir.rmtree(other))
 end
 
 

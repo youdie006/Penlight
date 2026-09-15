@@ -18,6 +18,9 @@ local append = table.insert
 local assert_arg,assert_string,raise = utils.assert_arg,utils.assert_string,utils.raise
 
 local exists, isdir, islink = path.exists, path.isdir, path.islink
+local abspath, normpath, isabs = path.abspath, path.normpath, path.isabs
+local parentdir = path.dirname
+local link_target = require 'lfs'.symlinkattributes
 local sep = path.sep
 
 local dir = {}
@@ -457,6 +460,18 @@ function dir.clonetree (path1,path2,file_fun,verbose)
 end
 
 
+-- a directory symlink whose target contains the link itself iterates forever
+local function links_to_ancestor(entry)
+    if not islink(entry) then return false end
+    local target = link_target(entry, 'target')
+    if not target then return false end
+    if not isabs(target) then target = parentdir(entry) .. sep .. target end
+    target = normpath(abspath(target))
+    local here = normpath(abspath(entry))
+    return here == target or sub(here, 1, #target + 1) == target .. sep
+end
+
+
 -- each entry of the stack is an array with three items:
 -- 1. the name of the directory
 -- 2. the lfs iterator function
@@ -478,7 +493,7 @@ local function treeiter(iterstack)
         entry = dirname .. sep .. entry
         if exists(entry) then  -- Just in case a symlink is broken.
             local is_dir = isdir(entry)
-            if is_dir and not islink(entry) then  -- a link to an ancestor would loop forever
+            if is_dir and not links_to_ancestor(entry) then
                 table.insert(iterstack, { entry, ldir(entry) })
             end
             return entry, is_dir
