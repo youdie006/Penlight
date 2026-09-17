@@ -460,11 +460,16 @@ function dir.clonetree (path1,path2,file_fun,verbose)
 end
 
 
--- a directory symlink whose target contains the link itself iterates forever
+-- a directory symlink whose target contains the link itself iterates forever.
+-- Windows reports the target through GetFinalPathNameByHandle, which expands 8.3
+-- names, so it need not compare equal to the path walked in with. There is no
+-- portable way to canonicalize the other side, so a link that cannot be ruled out
+-- is not descended into
 local function links_to_ancestor(entry)
     if not islink(entry) then return false end
+    if is_windows then return true end
     local target = link_target(entry, 'target')
-    if not target then return false end
+    if not target then return true end
     target = abspath(target, parentdir(entry))
     local here = abspath(entry)
     return here == target or common_prefix(here, target) == target
